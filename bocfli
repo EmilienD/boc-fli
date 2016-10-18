@@ -1,0 +1,110 @@
+#! /usr/bin/perl
+
+# this should read c code source from STDIN, and output the same code but with comments boxed
+# bocfli stands for "boxed comments for Linus", because I heard he loves boxed comments
+# And if linus loves it, everyone should use them!
+# Even if we don't all have the time and patience he has to box his comments properly.
+
+use strict;
+use warnings;
+
+# takes an array of strings and returns the length of the longest
+sub maxLength{
+  my $max = 0;
+  foreach (@{$_[0]}){
+    my $length = length;
+    $max = $length unless $length < $max;
+  }
+  return $max;
+}
+
+# takes a length "x" and a symbol
+# returns a string of x*symbol
+sub boxHorizontal{
+  my $length = $_[0];
+  my $sym = $_[1];
+  my $symLen = length $sym;
+  $length += 1; # ¯\_(ツ)_/¯
+  my $s = "";
+
+  for(; $length > 0; $length-=$symLen){$s .= $sym;}
+  
+  return $s;
+}
+
+# takes a string, a length and a symbol
+# returns a string starting by the symbol,
+# the original string, space for padding to len
+# and a space followed by the symbol as last chars
+sub boxVertical{
+  my $line = $_[0];
+  my $len = $_[1];
+  (length $line <= $len) or die "boxVertical can't do its job: ".length $line." > ". $len."\n";
+  my $sym = $_[2];
+
+  for(my $i = length $line; $i <= $len; $i++){
+    $line .= " ";
+  }
+
+  return $sym.$line." ".$sym;
+  
+}
+
+# takes a reference to an array of strings and a char
+# returns a string with the lines boxed by the char
+sub boxWithSymbol{
+  my @lines = @{$_[0]};
+  # removes trailing white spaces of every strings in the array
+  map { s/\s+$// } @lines;
+  my $sym = $_[1];
+  my $len = maxLength(\@lines);
+  $len += $len % (length $sym);
+
+  my $middle = "";
+
+  foreach (@lines){
+    $middle .= boxVertical($_, $len, $sym)."\n";
+  }
+
+  my $topAndBottom = boxHorizontal($len+4, $sym)."\n";
+  return $topAndBottom.$middle.$topAndBottom;
+}
+
+# multiline means the first commenting symbol we encountered is /*
+my $recordingMlt = 0; # $recordingMlt = false
+my $recordingSgl = 0;
+my $mlt = '/\*'; # $mlt for the beginning of multiline
+my $tml = '\*/'; # $tlm for the end symbol of multiline
+my $sgl = '//'; # $sgl for the symbol of single line
+my @linesToBox;
+
+while(<>){
+  if(/^\s*$mlt(.*)/){
+    $recordingMlt = 1; # $recordingMulti = true
+    $_ = $1;
+  }
+
+  if(/^\s*$sgl(.*)/ and not $recordingMlt){
+    $recordingSgl = 1;
+    $_ = $1;
+  }elsif($recordingSgl){
+    print boxWithSymbol(\@linesToBox, "//");
+    $recordingSgl = 0;
+    @linesToBox = ();
+  }
+
+  if($recordingMlt or $recordingSgl){
+    push @linesToBox, $_; # remember current line
+  }else{
+    print; # if it's not commented, output the line as is (Light!)
+  }
+
+  if($recordingMlt and s/$tml// and not $recordingSgl){
+    pop @linesToBox;
+    push @linesToBox, $_;
+    print boxWithSymbol(\@linesToBox, "//");
+    @linesToBox = ();
+    $recordingMlt = 0;
+  }
+}
+
