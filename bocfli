@@ -8,7 +8,7 @@
 use strict;
 use warnings;
 
-# takes an array of strings and returns the length of the longest
+# takes an array of strings and returns the length of the longest array
 sub maxLength{
   my $max = 0;
   foreach (@{$_[0]}){
@@ -18,31 +18,32 @@ sub maxLength{
   return $max;
 }
 
-# takes a length "x" and a symbol
-# returns a string of x*symbol
-sub boxHorizontal{
+# takes a length as parameter
+sub xTimesStar{
   my $length = $_[0];
-  my $sym = $_[1];
-  my $symLen = length $sym;
-  $length += 1; # ¯\_(ツ)_/¯
   my $s = "";
-
-  for(; $length > 0; $length-=$symLen){$s .= $sym;}
-  
+  for(; $length >= 0; $length--){$s .= "*";}
   return $s;
 }
+sub boxHorizontalTop{
+  return "/".xTimesStar($_[0]-1);
+}
+sub boxHorizontalBottom{
+  return xTimesStar($_[0]-1)."/";
+}
 
-# takes a string, a length and a symbol
-# returns a string starting by the symbol,
-# the original string, space for padding to len
-# and a space followed by the symbol as last chars
+
+# takes a string $line, a length $len and a symbol $sym
+# returns a string starting by the $sym,
+# followed by $line, space for padding to $len
+# and a space followed by $sym as last char
 sub boxVertical{
   my $line = $_[0];
   my $len = $_[1];
   (length $line <= $len) or die "boxVertical can't do its job: ".length $line." > ". $len."\n";
   my $sym = $_[2];
 
-  for(my $i = length $line; $i <= $len; $i++){
+  for(my $i = length $line; $i < $len; $i++){
     $line .= " ";
   }
 
@@ -50,24 +51,56 @@ sub boxVertical{
   
 }
 
-# takes a reference to an array of strings and a char
+# removes the empty lines at the end and beginning of an array
+sub lineChomp{
+  my $linesRef = $_[0];
+  my $hasEmpties = 1;
+  my $len = scalar @$linesRef;
+  while($hasEmpties){
+    $hasEmpties = 0;
+    if($linesRef->[0] =~ /^\s*$/){
+      shift @$linesRef;
+      $len--;
+      $hasEmpties = 1;
+    }
+    if($linesRef->[$len-1] =~ /^\s*$/){
+      pop @$linesRef;
+      $len--;
+      $hasEmpties = 1;
+    }
+  }
+}
+
+# takes a reference to an array of strings @lines and a char
 # returns a string with the lines boxed by the char
 sub boxWithSymbol{
   my @lines = @{$_[0]};
   # removes trailing white spaces of every strings in the array
-  map { s/\s+$// } @lines;
+  # and trailing and beginning stars too while we're at it
+  # because perl is awesome like that
+  map { s/[\s|\*]*$// & s/^\s*\*// } @lines;
+  # remove trailing and beginning empty lines
+  lineChomp(\@lines);
   my $sym = $_[1];
+
+  # the width of the box
+  # the maximum length of the text
   my $len = maxLength(\@lines);
+  # we make it dividable by the length of the symbol
   $len += $len % (length $sym);
 
+  # a atring with the lines between top and bottom lines
   my $middle = "";
 
+  # we put every line in the middle with $sym as first and last char
   foreach (@lines){
     $middle .= boxVertical($_, $len, $sym)."\n";
   }
 
-  my $topAndBottom = boxHorizontal($len+4, $sym)."\n";
-  return $topAndBottom.$middle.$topAndBottom;
+  my $symLenTimes2 = length($sym)*2;
+  my $top = boxHorizontalTop($len+$symLenTimes2)."\n";
+  my $bottom = boxHorizontalBottom($len+$symLenTimes2)."\n";
+  return $top.$middle.$bottom;
 }
 
 # multiline means the first commenting symbol we encountered is /*
@@ -84,25 +117,30 @@ while(<>){
     $_ = $1;
   }
 
+  # if there's a single line comment and we're not in a mutliline one
   if(/^\s*$sgl(.*)/ and not $recordingMlt){
-    $recordingSgl = 1;
-    $_ = $1;
-  }elsif($recordingSgl){
-    print boxWithSymbol(\@linesToBox, "//");
-    $recordingSgl = 0;
-    @linesToBox = ();
+    $recordingSgl = 1; # we start recording
+    $_ = $1; # and we use the string extracted by the regex as current string
+  }elsif($recordingSgl){ # else if it's the end of a set of single line comments
+    # we output the set of comments in a box
+    print boxWithSymbol(\@linesToBox, "*");
+    $recordingSgl = 0; # we stop recording
+    @linesToBox = (); # we reset the lines list
   }
 
+  # if we're recording
   if($recordingMlt or $recordingSgl){
     push @linesToBox, $_; # remember current line
   }else{
-    print; # if it's not commented, output the line as is (Light!)
+    print; # else output the line as is
   }
 
+  # if we're recording multiline
+  # and we find the end of multiline symbol
   if($recordingMlt and s/$tml// and not $recordingSgl){
     pop @linesToBox;
     push @linesToBox, $_;
-    print boxWithSymbol(\@linesToBox, "//");
+    print boxWithSymbol(\@linesToBox, "*");
     @linesToBox = ();
     $recordingMlt = 0;
   }
